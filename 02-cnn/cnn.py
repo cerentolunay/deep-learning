@@ -9,7 +9,8 @@ import torch.optim as optim  # optimization library
 import torchvision # computer vision library
 import torchvision.transforms as transforms # data augmentation library
 import matplotlib.pyplot as plt # visualization library  
-import numpy as np # numerical computing library        
+import numpy as np # numerical computing library  
+import os      
 
 # load dataset  
 def get_dataloaders(batch_size=64): #batch size her iterasyonda islenecek veri sayısını belirler
@@ -54,7 +55,7 @@ def visualize(n=5):
         plt.axis("off") # eksenleri gizle
     plt.show()
 
-visualize(3)
+#visualize(3)
 
 #%% build CNN model
 class CNN(nn.Module): # CNN sınıfı nn.Module sınıfından miras alır
@@ -91,7 +92,7 @@ class CNN(nn.Module): # CNN sınıfı nn.Module sınıfından miras alır
         return x  
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # cihazı belirle (GPU varsa kullan, yoksa CPU kullan)    
-model = CNN().to(device) 
+#model = CNN().to(device) 
 
 # define loss function and optimizer
 define_loss_and_optimizer = lambda model: (
@@ -129,16 +130,69 @@ def train_model(model, train_loader, criterion, optimizer, epochs = 5):
     plt.ylabel("Loss") # y ekseni etiketi
     plt.title("Training Loss") # grafik başlığı
     plt.legend() # legend göster
+    os.makedirs("results", exist_ok=True)
+    plt.savefig("results/training_loss.png",dpi=300, bbox_inches="tight")
     plt.show() # grafiği göster
-
-train_loader, test_loader = get_dataloaders()
-model= CNN().to(device)
-criterion, optimizer = define_loss_and_optimizer(model)
-train_model(model, train_loader, criterion, optimizer, epochs=10)
-
-
+    plt.close() # grafiği kapat
+#train_loader, test_loader = get_dataloaders()
+#model= CNN().to(device)
+#criterion, optimizer = define_loss_and_optimizer(model)
+#train_model(model, train_loader, criterion, optimizer, epochs=10)
 
 
 #%% test the model
+# model ne kadar öğrendi ve test veri setinde ne kadar başarılı olduğunu görmek için test aşamasına geçelim
+
+def test_model(model, test_loader, dataset_type="test"):
+
+    model.eval() # modeli değerlendirme moduna al
+    correct = 0 # doğru tahmin sayacı
+    total = 0 # toplam tahmin sayacı
+
+    with torch.no_grad(): # gradyan hesaplamalarını kapat
+        for images, labels in test_loader: #test veri setiyle değerlendirme 
+            images, labels = images.to(device), labels.to(device) 
+            outputs = model(images) # prediction 
+            _, predicted = torch.max(outputs, 1) # en yüksek olasılığa sahip sınıfı tahmin olarak al
+            total += labels.size(0) #toplam tahmin sayısını güncelle
+            correct += (predicted == labels).sum().item() #doğru tahmin sayısını güncelle
+
+    accuracy = 100 * correct / total
+    print(f"{dataset_type} accuracy: {accuracy:.2f}%")
+
+    os.makedirs("results", exist_ok=True)
+
+    with open("results/results.txt", "a", encoding="utf-8") as f:
+        f.write(f"{dataset_type} accuracy: {accuracy:.2f}%\n")
+    return accuracy
+#test_model(model, test_loader, dataset_type="test") #test accuracy 62.58 %
+#test_model(model, train_loader, dataset_type="training") # training accuracy 65.378 % 
 
 
+
+
+
+# %% main program 
+
+if __name__ == "__main__":
+    os.makedirs("results", exist_ok=True)
+    open("results/results.txt", "w").close()
+
+    #veri seti yükleme
+    train_loader, test_loader = get_dataloaders() 
+    #görselleştirme
+    visualize(5)
+
+    #training
+    model = CNN().to(device) 
+    criterion, optimizer = define_loss_and_optimizer(model) 
+    train_model(model, train_loader, criterion, optimizer, epochs=10) 
+
+    # test
+    test_accuracy = test_model(model, test_loader, dataset_type="test")
+    train_accuracy = test_model(model, train_loader, dataset_type="training")
+
+
+
+
+# %%
