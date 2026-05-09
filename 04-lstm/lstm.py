@@ -36,17 +36,78 @@ ix_to_word = {i: word for i, word in enumerate(vocab)}
 
 # eğitim verisi hazırlama 
 data = [(words[i], words[i+1]) for i in range(len(words)-1)]
- 
-
-
-
 
 #%% lstm modeli tanımlama
 
+class LSTM(nn.Module):
 
+    def __init__(self, vocab_size, embedding_dim, hidden_dim):
+        super(LSTM, self).__init__()# bir üst sınıfın constructor'ını çağırma
+        self.embedding = nn.Embedding(vocab_size, embedding_dim) # embedding katmanı
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim) # lstm katmanı
+        self.fc = nnLinear(hidden_dim, vocab_size) # tam bağlantılı katman
 
-
+    def forward(self, x):    # ileri besleme fonksiyonu
+        
+        x = self.embedding(x) # input-> embedding
+        lstm_out, _ = self.lstm(x.view(1,1,-1))
+        output=self.fc(lstm_out.view(1,-1)) # lstm-> tam bağlantılı katman
+        return output
+ 
 #%%hyperparameter tuning
+
+# kelime listesi -> tensor
+def prepare_sequence(seq, to_ix):
+    return torch.tensor([to_ix[w] for w in seq], dtype=torch.long)
+
+#hyperparametre tuning kombinasyonlarını belirle
+embeding_sizes = [8, 16]# denenecek embedding boyutları
+hidden_sizes = [32, 64]# denenecek gizli katman boyutları
+learning_rates = [0.01, 0.005]# öğrenme oranı learing rate
+
+best_loss = float('inf') # en düşük kayıp değeri saklamak için bir değişken
+best_params={} # en iyi parametreleri saklamak için bir dictionary
+
+print("Hyperparameter Tuning Başlıyor...")
+
+# grid search 
+for emb_size, hidden_size, lr in product(embeding_sizes, hidden_sizes, learning_rates):
+    print(f"Deneme: Embedding Dim={emb_size}, Hidden Dim={hidden_size}, Learning Rate={lr}")
+    
+    # model oluşturma
+    model = LSTM(len(vocab), emb_size, hidden_size) # seçilen parametrelerlemodel oluşturma
+    loss_function = nn.CrossEntropyLoss() # kayıp fonksiyonu
+    optimizer = optim.Adam(model.parameters(), lr=lr) # optimizer
+
+    # eğitim 
+    epochs= 50
+    total_loss = 0
+    for epoch in range(epochs):
+        epoch_loss = 0 #epoch başına kayıp değerini sıfırla
+        for word, next_word in data:
+            model.zero_grad() # modelin parametrelerini sıfırla
+            input_tensor = prepare_sequence([word], word_to_ix) # girdiyi tensöre çevir
+            target_tensor= prepare_sequence ([next_word], word_to_ix) # hedef kelimeyi tensöre çevir
+            output = model(input_tensor) # prediction
+            loss= loss_function(output, target_tensor)
+            loss.backward() # geri yayılım uygula
+            optimizer.step() # parametreleri güncelle
+            epoch_loss += loss.item() # epoch kaybını güncelle
+
+        if epoch % 10 == 0: # her 10 epochta bir kayıp değerini yazdır
+            print(f"Epoch {epoch}, Loss: {epoch_loss:.5f}")    
+        total_loss= epoch_loss 
+
+    #en iyi modeli kaydet
+    if total_loss < best_loss:
+        best_loss = total_loss
+        best_params = {'embedding_dim': emb_size, 'hidden_dim': hidden_size, 'learning_rate': lr}
+    print()    
+print("En İyi Parametreler: {best_params}")
+
+
+
+
 
 
 #%% lstm training 
