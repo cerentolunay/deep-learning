@@ -111,6 +111,25 @@ print("En İyi Parametreler: {best_params}")
 
 
 #%% lstm training 
+final_model= LSTM(len(vocab), best_params['embedding_dim'], best_params['hidden_dim'])
+optimizer=optim.Adam(final_model.parameters(), lr = best_params['learing_rate'])
+loss_function = nn.CrossEntropyLoss() # kayıp fonksiyonu 
+print("final model training")
+epochs =100
+for epoch in range(epochs):
+    epoch_loss=0
+    for word, next_word in data:
+        final_model.zero_grad()
+        input_tensor = prepare_sequence([word], word_to_ix)
+        target_tensor= prepare_sequence([next_word], word_to_ix)
+        output=final_model(input_tensor)
+        loss = loss_function(output, target_tensor)
+        loss.backward()
+        optimizer.step()
+        epoch_loss += loss.item()
+    if epoch %10 == 0:
+        print(f"final model epoch :{epoch}, loss:{epoch_loss:.5f}")
+        
 
 
 #%% test ve degerlendirme evolution
